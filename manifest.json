@@ -1,0 +1,19 @@
+{
+    "name": "Fixhub",
+    "version": "1.0",
+    "manifest_version": 3,
+    "description": "QOL fixes for github.",
+    "permissions": ["storage", "activeTab"],
+    "host_permissions": ["https://api.github.com/*"],
+    "action": {
+        "default_popup": "popup.html",
+        "default_icon": "fh-icon.png"
+    },
+    "content_scripts": [
+        {
+            "matches": ["https://github.com/*/pulls*"],
+            "js": ["content.js"],
+            "css": ["styles.css"]
+        }
+    ]
+}

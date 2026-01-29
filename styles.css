@@ -1,0 +1,85 @@
+.fh-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  vertical-align: middle;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px #d0d7de;
+}
+
+.fh-reviewer-col {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 4px;
+  flex-shrink: 0;
+  width: var(--fh-reviewer-col-width, 160px);
+  min-width: var(--fh-reviewer-col-width, 160px);
+  padding: 8px 12px;
+  box-sizing: border-box;
+}
+
+.fh-reviewer-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  line-height: 30px;
+}
+
+.fh-reviewer-link + .fh-reviewer-link {
+  margin-left: 0;
+}
+
+.fh-review-approved {
+  border-color: #1a7f37;
+  box-shadow: 0 0 0 1px #1a7f37;
+}
+
+.fh-review-commented {
+  border-color: #bf8700;
+  box-shadow: 0 0 0 1px #bf8700;
+}
+
+.fh-review-changes_requested {
+  border-color: #cf222e;
+  box-shadow: 0 0 0 1px #cf222e;
+}
+
+.fh-review-pending {
+  border-color: #d0d7de;
+  box-shadow: 0 0 0 1px #d0d7de;
+}
+
+.fh-author-avatar {
+  width: 20px;
+  height: 20px;
+  margin-right: 4px;
+  margin-top: -2px;
+  margin-bottom: -2px;
+}
+
+/* Keep author avatar inline */
+.opened-by a[data-fh-original] {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+
+
+.fh-reviewers-header-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  color: #656d76;
+  font-size: 14px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.fh-hidden.fh-hidden {
+  display: none !important;
+}
