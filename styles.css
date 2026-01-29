@@ -3,7 +3,7 @@
   height: 30px;
   border-radius: 50%;
   vertical-align: middle;
-  border: 2px solid #fff;
+  border: 1px solid #fff;
   box-shadow: 0 0 0 1px #d0d7de;
 }
 
@@ -54,18 +54,14 @@
 }
 
 .fh-author-avatar {
-  width: 20px;
-  height: 20px;
-  margin-right: 4px;
-  margin-top: -2px;
-  margin-bottom: -2px;
+  width: 30px;
+  height: 30px;
+  margin-right: 6px;
 }
 
-/* Keep author avatar inline */
-.opened-by a[data-fh-original] {
-  display: inline-flex;
+/* Align opened-by row when author avatar is present */
+.d-flex:has(.fh-author-avatar) {
   align-items: center;
-  vertical-align: middle;
 }
 
 
