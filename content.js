@@ -5,6 +5,7 @@
     authorAvatar: false,
     hideAssignees: false,
     enableCache: false,
+    ignoreUsers: '',
     ghToken: '',
   };
 
@@ -152,7 +153,7 @@
 
       const fetcher = settings.scrapeReviewers ? scrapeReviewers : fetchReviewers;
       const p = fetcher(owner, repo, prNumber).then((reviewerMap) => {
-        insertReviewerCol(flexContainer, reviewerMap);
+        insertReviewerCol(flexContainer, filterIgnored(reviewerMap));
       });
       fetchPromises.push(p);
     });
@@ -209,6 +210,20 @@
     }
 
     flexContainer.appendChild(col);
+  }
+
+  function getIgnoredUsers() {
+    return new Set(
+      (settings.ignoreUsers || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
+    );
+  }
+
+  function filterIgnored(reviewerMap) {
+    const ignored = getIgnoredUsers();
+    for (const name of reviewerMap.keys()) {
+      if (ignored.has(name.toLowerCase()) || name.endsWith('[bot]')) reviewerMap.delete(name);
+    }
+    return reviewerMap;
   }
 
   const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
