@@ -263,21 +263,28 @@
       const html = await res.text();
       const doc = new DOMParser().parseFromString(html, 'text/html');
 
-      // Each reviewer has an <a id="review-status-USERNAME"> link in the sidebar
-      doc.querySelectorAll('a[id^="review-status-"]').forEach((statusLink) => {
-        const username = statusLink.id.replace('review-status-', '');
+      const form = doc.querySelector('.js-issue-sidebar-form[aria-label="Select reviewers"]');
+      if (!form) { setCache(cacheKey, reviewers); return reviewers; }
+
+      // Find all reviewer rows — each is a p.d-flex with a user hovercard span
+      form.querySelectorAll('p.d-flex > span[data-assignee-name]').forEach((span) => {
+        const username = span.dataset.assigneeName;
         if (!username) return;
 
-        // Determine state from SVG class and icon shape
-        const svg = statusLink.querySelector('svg');
-        const cls = svg ? (svg.getAttribute('class') || '') : '';
+        // Check if they have a review status link
+        const row = span.closest('p.d-flex');
+        const statusLink = row?.querySelector(`a[id="review-status-${username}"]`);
+
         let state = 'pending';
-        if (cls.includes('color-fg-success')) state = 'approved';
-        else if (cls.includes('color-fg-danger')) state = 'changes_requested';
-        else if (cls.includes('color-fg-attention')) state = 'commented';
-        else if (cls.includes('octicon-eye')) state = 'commented';
-        else if (cls.includes('octicon-comment')) state = 'commented';
-        else if (svg) state = 'commented'; // has a status icon but unknown class = commented
+        if (statusLink) {
+          const svg = statusLink.querySelector('svg');
+          const cls = svg ? (svg.getAttribute('class') || '') : '';
+          if (cls.includes('color-fg-success')) state = 'approved';
+          else if (cls.includes('color-fg-danger')) state = 'changes_requested';
+          else if (cls.includes('octicon-comment') || cls.includes('color-fg-muted')) state = 'commented';
+          else if (cls.includes('color-fg-attention')) state = 'commented';
+          else if (svg) state = 'commented';
+        }
 
         reviewers.set(username, state);
       });
