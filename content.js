@@ -1,14 +1,19 @@
 (() => {
   let settings = {
     reviewerAvatars: false,
+    scrapeReviewers: false,
     authorAvatar: false,
     hideAssignees: false,
+    enableCache: false,
     ghToken: '',
   };
 
   function init() {
     chrome.storage.sync.get(Object.keys(settings), (data) => {
       Object.assign(settings, data);
+      if (!settings.enableCache) {
+        clearReviewerCache();
+      }
       apply();
     });
   }
@@ -17,6 +22,9 @@
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg.type === 'settingChanged') {
       settings[msg.key] = msg.value;
+      if (msg.key === 'enableCache' && !msg.value) {
+        clearReviewerCache();
+      }
       apply();
     }
   });
@@ -81,15 +89,28 @@
   }
 
   // --- Reviewer avatars ---
+  let lastReviewerMethod = '';
   function applyReviewerAvatars() {
-    if (!settings.reviewerAvatars) {
+    const method = settings.scrapeReviewers ? 'scrape' : settings.reviewerAvatars ? 'api' : '';
+
+    if (!method) {
       document.querySelectorAll('.fh-reviewer-col').forEach((el) => el.remove());
       const existingHeader = document.getElementById('fh-reviewers-header');
       if (existingHeader) existingHeader.remove();
       document.querySelectorAll('.js-issue-row').forEach((row) => {
         delete row.dataset.fhReviewersFetched;
       });
+      lastReviewerMethod = '';
       return;
+    }
+
+    // If method changed, clear existing results and re-fetch
+    if (method !== lastReviewerMethod) {
+      document.querySelectorAll('.fh-reviewer-col').forEach((el) => el.remove());
+      document.querySelectorAll('.js-issue-row').forEach((row) => {
+        delete row.dataset.fhReviewersFetched;
+      });
+      lastReviewerMethod = method;
     }
 
     // Insert "Reviewers" header label at the end of the toolbar
@@ -129,7 +150,8 @@
         return;
       }
 
-      const p = fetchReviewers(owner, repo, prNumber).then((reviewerMap) => {
+      const fetcher = settings.scrapeReviewers ? scrapeReviewers : fetchReviewers;
+      const p = fetcher(owner, repo, prNumber).then((reviewerMap) => {
         insertReviewerCol(flexContainer, reviewerMap);
       });
       fetchPromises.push(p);
@@ -191,7 +213,14 @@
 
   const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
+  function clearReviewerCache() {
+    Object.keys(sessionStorage).forEach((k) => {
+      if (k.startsWith('fh-reviewers')) sessionStorage.removeItem(k);
+    });
+  }
+
   function getCached(key) {
+    if (!settings.enableCache) return null;
     try {
       const raw = sessionStorage.getItem(key);
       if (!raw) return null;
@@ -207,6 +236,7 @@
   }
 
   function setCache(key, reviewerMap) {
+    if (!settings.enableCache) return;
     try {
       sessionStorage.setItem(key, JSON.stringify({
         data: [...reviewerMap.entries()],
@@ -215,6 +245,49 @@
     } catch (_) {
       // Storage full or unavailable
     }
+  }
+
+  async function scrapeReviewers(owner, repo, number) {
+    const cacheKey = `fh-reviewers:${owner}/${repo}#${number}`;
+    const cached = getCached(cacheKey);
+    if (cached) return cached;
+
+    const reviewers = new Map();
+
+    try {
+      const res = await fetch(`https://github.com/${owner}/${repo}/pull/${number}`, {
+        credentials: 'include',
+      });
+      if (!res.ok) return reviewers;
+
+      const html = await res.text();
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+
+      // Each reviewer has an <a id="review-status-USERNAME"> link in the sidebar
+      doc.querySelectorAll('a[id^="review-status-"]').forEach((statusLink) => {
+        const username = statusLink.id.replace('review-status-', '');
+        if (!username) return;
+
+        // Determine state from SVG class and icon shape
+        const svg = statusLink.querySelector('svg');
+        const cls = svg ? (svg.getAttribute('class') || '') : '';
+        let state = 'pending';
+        if (cls.includes('color-fg-success')) state = 'approved';
+        else if (cls.includes('color-fg-danger')) state = 'changes_requested';
+        else if (cls.includes('color-fg-attention')) state = 'commented';
+        else if (cls.includes('octicon-eye')) state = 'commented';
+        else if (cls.includes('octicon-comment')) state = 'commented';
+        else if (svg) state = 'commented'; // has a status icon but unknown class = commented
+
+        reviewers.set(username, state);
+      });
+
+      setCache(cacheKey, reviewers);
+    } catch (_) {
+      // Ignore fetch errors
+    }
+
+    return reviewers;
   }
 
   async function fetchReviewers(owner, repo, number) {
@@ -290,7 +363,7 @@
       applyHideAssignees();
       applyAuthorAvatars();
       // Only fetch reviewers for new rows (applyReviewerAvatars already skips fetched rows)
-      if (settings.reviewerAvatars) {
+      if (settings.reviewerAvatars || settings.scrapeReviewers) {
         applyReviewerAvatars();
       }
     }, 100);

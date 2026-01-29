@@ -1,4 +1,4 @@
-const KEYS = ['reviewerAvatars', 'authorAvatar', 'hideAssignees'];
+const KEYS = ['reviewerAvatars', 'scrapeReviewers', 'authorAvatar', 'hideAssignees', 'enableCache'];
 const TOKEN_KEY = 'ghToken';
 
 document.addEventListener('DOMContentLoaded', () => {
