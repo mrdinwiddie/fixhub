@@ -1,4 +1,4 @@
-const KEYS = ['reviewerAvatars', 'scrapeReviewers', 'authorAvatar', 'hideAssignees', 'enableCache'];
+const KEYS = ['reviewerAvatars', 'scrapeReviewers', 'authorAvatar', 'hideAssignees', 'showReviewerNames', 'enableCache'];
 const TEXT_KEYS = ['ignoreUsers'];
 const TOKEN_KEY = 'ghToken';
 

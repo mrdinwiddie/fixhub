@@ -4,6 +4,7 @@
     scrapeReviewers: false,
     authorAvatar: false,
     hideAssignees: false,
+    showReviewerNames: false,
     enableCache: false,
     ignoreUsers: '',
     ghToken: '',
@@ -34,6 +35,8 @@
     applyHideAssignees();
     applyAuthorAvatars();
     applyReviewerAvatars();
+    document.documentElement.classList.toggle('fh-show-reviewer-names', !!settings.showReviewerNames);
+    updateReviewerColWidth();
   }
 
   // --- Hide assignees column ---
@@ -172,8 +175,20 @@
 
     if (longest === 0) return;
 
-    // padding (24px) + avatar (30px) + gap (6px) + text (approx 7.2px per char at 12px font) + buffer
-    const width = 24 + 30 + 6 + Math.ceil(longest * 7.2) + 8;
+    let width;
+    if (settings.showReviewerNames) {
+      // padding (24px) + avatar (30px) + gap (6px) + text (approx 7.2px per char at 12px font) + buffer
+      width = 24 + 30 + 6 + Math.ceil(longest * 7.2) + 8;
+    } else {
+      // Find the max number of reviewers across all rows
+      let maxCount = 0;
+      document.querySelectorAll('.fh-reviewer-col').forEach((col) => {
+        const count = col.querySelectorAll('.fh-reviewer-link').length;
+        if (count > maxCount) maxCount = count;
+      });
+      // padding (24px) + avatars (30px each) + gaps (4px between)
+      width = 24 + maxCount * 30 + Math.max(0, maxCount - 1) * 4;
+    }
     document.documentElement.style.setProperty('--fh-reviewer-col-width', width + 'px');
 
     // Apply matching width to the header
@@ -205,7 +220,10 @@
       img.className = `fh-avatar fh-reviewer-avatar fh-review-${state}`;
 
       link.appendChild(img);
-      link.appendChild(document.createTextNode(name));
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'fh-reviewer-name';
+      nameSpan.textContent = name;
+      link.appendChild(nameSpan);
       col.appendChild(link);
     }
 
