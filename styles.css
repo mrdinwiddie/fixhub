@@ -93,3 +93,19 @@
 .fh-hidden.fh-hidden {
   display: none !important;
 }
+
+#fh-copy-feedback-btn {
+  margin-right: 4px;
+}
+
+.fh-inline-msg {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 12px;
+  color: #656d76;
+  animation: fh-fade-out 0.5s ease 2.5s forwards;
+}
+
+@keyframes fh-fade-out {
+  to { opacity: 0; }
+}

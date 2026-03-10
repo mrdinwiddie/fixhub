@@ -6,6 +6,7 @@
     hideAssignees: false,
     showReviewerNames: false,
     enableCache: false,
+    copyFeedback: false,
     ignoreUsers: '',
     ghToken: '',
   };
@@ -17,6 +18,7 @@
         clearReviewerCache();
       }
       apply();
+      applyCopyFeedbackButton();
     });
   }
 
@@ -28,6 +30,7 @@
         clearReviewerCache();
       }
       apply();
+      applyCopyFeedbackButton();
     }
   });
 
@@ -381,6 +384,146 @@
     }
 
     return reviewers;
+  }
+
+  // --- Copy unresolved feedback ---
+  function applyCopyFeedbackButton() {
+    const prMatch = window.location.pathname.match(/^\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
+
+    if (!prMatch || !settings.copyFeedback) {
+      const existing = document.getElementById('fh-copy-feedback-btn');
+      if (existing) existing.remove();
+      return;
+    }
+
+    if (document.getElementById('fh-copy-feedback-btn')) return;
+
+    const [, owner, repo, number] = prMatch;
+    const headerActions = document.querySelector('.gh-header-actions');
+    if (!headerActions) return;
+
+    const btn = document.createElement('button');
+    btn.id = 'fh-copy-feedback-btn';
+    btn.className = 'btn btn-sm';
+    btn.textContent = 'Copy feedback';
+    btn.addEventListener('click', () => onCopyFeedbackClick(btn, owner, repo, number));
+    headerActions.prepend(btn);
+  }
+
+  async function onCopyFeedbackClick(btn, owner, repo, number) {
+    if (!settings.ghToken) {
+      showInlineMsg(btn, 'Set a GitHub token in Fixhub settings');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Fetching...';
+
+    try {
+      const threads = await fetchUnresolvedThreads(owner, repo, number);
+      if (!threads || threads.length === 0) {
+        showInlineMsg(btn, 'No unresolved threads');
+        return;
+      }
+      const md = formatThreadsAsMarkdown(threads);
+      await navigator.clipboard.writeText(md);
+      showInlineMsg(btn, `Copied ${threads.length} thread${threads.length === 1 ? '' : 's'}`);
+    } catch (err) {
+      showInlineMsg(btn, 'Error: ' + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Copy feedback';
+    }
+  }
+
+  function showInlineMsg(btn, text) {
+    let msg = btn.parentElement.querySelector('.fh-inline-msg');
+    if (msg) msg.remove();
+    msg = document.createElement('span');
+    msg.className = 'fh-inline-msg';
+    msg.textContent = text;
+    btn.insertAdjacentElement('afterend', msg);
+    setTimeout(() => msg.remove(), 3000);
+  }
+
+  async function fetchUnresolvedThreads(owner, repo, number) {
+    const threads = [];
+    let cursor = null;
+
+    while (true) {
+      const afterClause = cursor ? `, after: "${cursor}"` : '';
+      const query = `query {
+        repository(owner: "${owner}", name: "${repo}") {
+          pullRequest(number: ${number}) {
+            reviewThreads(first: 100${afterClause}) {
+              pageInfo { hasNextPage endCursor }
+              nodes {
+                isResolved
+                isOutdated
+                path
+                line
+                comments(first: 100) {
+                  nodes {
+                    author { login }
+                    body
+                    createdAt
+                  }
+                }
+              }
+            }
+          }
+        }
+      }`;
+
+      const res = await fetch('https://api.github.com/graphql', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${settings.ghToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query }),
+      });
+
+      if (!res.ok) throw new Error(`GitHub API returned ${res.status}`);
+
+      const json = await res.json();
+      if (json.errors) throw new Error(json.errors[0].message);
+
+      const data = json.data.repository.pullRequest.reviewThreads;
+      for (const node of data.nodes) {
+        if (!node.isResolved) {
+          threads.push(node);
+        }
+      }
+
+      if (!data.pageInfo.hasNextPage) break;
+      cursor = data.pageInfo.endCursor;
+    }
+
+    return threads;
+  }
+
+  function formatThreadsAsMarkdown(threads) {
+    let md = '## Unresolved Review Feedback\n\n';
+
+    for (const thread of threads) {
+      const location = thread.line ? `${thread.path} (line ${thread.line})` : thread.path;
+      md += `### \`${location}\`${thread.isOutdated ? ' (outdated)' : ''}\n`;
+
+      for (const comment of thread.comments.nodes) {
+        const date = comment.createdAt.slice(0, 10);
+        const author = comment.author?.login || 'unknown';
+        md += `> **@${author}** (${date}):\n`;
+        for (const line of comment.body.split('\n')) {
+          md += `> ${line}\n`;
+        }
+        md += '\n';
+      }
+
+      md += '---\n\n';
+    }
+
+    return md.trimEnd() + '\n';
   }
 
   // Run on initial load — wait for PR rows to appear
