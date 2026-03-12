@@ -399,7 +399,7 @@
 
     if (document.getElementById('fh-copy-feedback-btn')) return;
 
-    const headerActions = document.querySelector('.gh-header-actions');
+    const headerActions = document.querySelector('[data-component="PH_Actions"] .d-flex') || document.querySelector('.gh-header-actions');
     if (!headerActions) return;
 
     const btn = document.createElement('button');
