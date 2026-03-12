@@ -38,6 +38,7 @@
     applyHideAssignees();
     applyAuthorAvatars();
     applyReviewerAvatars();
+    applyCopyFeedbackButton();
     document.documentElement.classList.toggle('fh-show-reviewer-names', !!settings.showReviewerNames);
     updateReviewerColWidth();
   }
@@ -398,7 +399,6 @@
 
     if (document.getElementById('fh-copy-feedback-btn')) return;
 
-    const [, owner, repo, number] = prMatch;
     const headerActions = document.querySelector('.gh-header-actions');
     if (!headerActions) return;
 
@@ -406,22 +406,16 @@
     btn.id = 'fh-copy-feedback-btn';
     btn.className = 'btn btn-sm';
     btn.textContent = 'Copy feedback';
-    btn.addEventListener('click', () => onCopyFeedbackClick(btn, owner, repo, number));
+    btn.addEventListener('click', () => onCopyFeedbackClick(btn));
     headerActions.prepend(btn);
   }
 
-  async function onCopyFeedbackClick(btn, owner, repo, number) {
-    if (!settings.ghToken) {
-      showInlineMsg(btn, 'Set a GitHub token in Fixhub settings');
-      return;
-    }
-
+  async function onCopyFeedbackClick(btn) {
     btn.disabled = true;
-    btn.textContent = 'Fetching...';
 
     try {
-      const threads = await fetchUnresolvedThreads(owner, repo, number);
-      if (!threads || threads.length === 0) {
+      const threads = scrapeUnresolvedThreads();
+      if (threads.length === 0) {
         showInlineMsg(btn, 'No unresolved threads');
         return;
       }
@@ -432,7 +426,6 @@
       showInlineMsg(btn, 'Error: ' + err.message);
     } finally {
       btn.disabled = false;
-      btn.textContent = 'Copy feedback';
     }
   }
 
@@ -446,59 +439,25 @@
     setTimeout(() => msg.remove(), 3000);
   }
 
-  async function fetchUnresolvedThreads(owner, repo, number) {
+  function scrapeUnresolvedThreads() {
     const threads = [];
-    let cursor = null;
 
-    while (true) {
-      const afterClause = cursor ? `, after: "${cursor}"` : '';
-      const query = `query {
-        repository(owner: "${owner}", name: "${repo}") {
-          pullRequest(number: ${number}) {
-            reviewThreads(first: 100${afterClause}) {
-              pageInfo { hasNextPage endCursor }
-              nodes {
-                isResolved
-                isOutdated
-                path
-                line
-                comments(first: 100) {
-                  nodes {
-                    author { login }
-                    body
-                    createdAt
-                  }
-                }
-              }
-            }
-          }
-        }
-      }`;
+    document.querySelectorAll('.js-resolvable-timeline-thread-container').forEach((container) => {
+      if (container.dataset.resolved === 'true') return;
 
-      const res = await fetch('https://api.github.com/graphql', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${settings.ghToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ query }),
+      const pathLink = container.querySelector('a[href*="#diff-"]');
+      const path = pathLink?.textContent?.trim() || '';
+      const isOutdated = !!container.querySelector('.outdated-comment-label');
+
+      const comments = [];
+      container.querySelectorAll('.review-comment, .js-review-comment').forEach((comment) => {
+        const author = comment.querySelector('.author')?.textContent?.trim() || 'unknown';
+        const body = comment.querySelector('.comment-body, .js-comment-body')?.innerText?.trim() || '';
+        if (body) comments.push({ author, body });
       });
 
-      if (!res.ok) throw new Error(`GitHub API returned ${res.status}`);
-
-      const json = await res.json();
-      if (json.errors) throw new Error(json.errors[0].message);
-
-      const data = json.data.repository.pullRequest.reviewThreads;
-      for (const node of data.nodes) {
-        if (!node.isResolved) {
-          threads.push(node);
-        }
-      }
-
-      if (!data.pageInfo.hasNextPage) break;
-      cursor = data.pageInfo.endCursor;
-    }
+      if (comments.length > 0) threads.push({ path, isOutdated, comments });
+    });
 
     return threads;
   }
@@ -507,13 +466,10 @@
     let md = '## Unresolved Review Feedback\n\n';
 
     for (const thread of threads) {
-      const location = thread.line ? `${thread.path} (line ${thread.line})` : thread.path;
-      md += `### \`${location}\`${thread.isOutdated ? ' (outdated)' : ''}\n`;
+      md += `### \`${thread.path}\`${thread.isOutdated ? ' (outdated)' : ''}\n`;
 
-      for (const comment of thread.comments.nodes) {
-        const date = comment.createdAt.slice(0, 10);
-        const author = comment.author?.login || 'unknown';
-        md += `> **@${author}** (${date}):\n`;
+      for (const comment of thread.comments) {
+        md += `> **@${comment.author}**:\n`;
         for (const line of comment.body.split('\n')) {
           md += `> ${line}\n`;
         }
