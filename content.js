@@ -493,10 +493,12 @@
   document.addEventListener('turbo:load', init);
 
   // Observe for dynamically inserted PR rows (GitHub may load them after initial paint)
+  // Also retries applyCopyFeedbackButton in case .gh-header-actions wasn't in the DOM yet
   let observerTimeout;
   const observer = new MutationObserver(() => {
     const newRows = document.querySelectorAll('.js-issue-row:not([data-fh-reviewers-fetched])');
-    if (newRows.length === 0) return;
+    const needsBtn = settings.copyFeedback && !document.getElementById('fh-copy-feedback-btn');
+    if (newRows.length === 0 && !needsBtn) return;
     clearTimeout(observerTimeout);
     observerTimeout = setTimeout(() => {
       applyHideAssignees();
@@ -505,6 +507,7 @@
       if (settings.reviewerAvatars || settings.scrapeReviewers) {
         applyReviewerAvatars();
       }
+      applyCopyFeedbackButton();
     }, 100);
   });
   observer.observe(document.body, { childList: true, subtree: true });
