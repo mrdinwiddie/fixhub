@@ -404,7 +404,12 @@
 
     const btn = document.createElement('button');
     btn.id = 'fh-copy-feedback-btn';
-    btn.className = 'btn btn-sm';
+    const siblingBtn = headerActions.querySelector('button');
+    btn.className = siblingBtn ? siblingBtn.className : 'btn btn-sm';
+    if (siblingBtn) {
+      btn.dataset.size = siblingBtn.dataset.size || '';
+      btn.dataset.variant = siblingBtn.dataset.variant || '';
+    }
     btn.textContent = 'Copy feedback';
     btn.addEventListener('click', () => onCopyFeedbackClick(btn));
     headerActions.prepend(btn);
@@ -447,16 +452,18 @@
 
       const pathLink = container.querySelector('a[href*="#diff-"]');
       const path = pathLink?.textContent?.trim() || '';
+      const lineMatch = pathLink?.getAttribute('href')?.match(/R(\d+)$/);
+      const line = lineMatch ? parseInt(lineMatch[1]) : null;
       const isOutdated = !!container.querySelector('.outdated-comment-label');
 
       const comments = [];
       container.querySelectorAll('.review-comment, .js-review-comment').forEach((comment) => {
         const author = comment.querySelector('.author')?.textContent?.trim() || 'unknown';
-        const body = comment.querySelector('.comment-body, .js-comment-body')?.innerText?.trim() || '';
+        const body = comment.querySelector('.comment-body, .js-comment-body')?.textContent?.trim() || '';
         if (body) comments.push({ author, body });
       });
 
-      if (comments.length > 0) threads.push({ path, isOutdated, comments });
+      if (comments.length > 0) threads.push({ path, line, isOutdated, comments });
     });
 
     return threads;
@@ -466,7 +473,8 @@
     let md = '## Unresolved Review Feedback\n\n';
 
     for (const thread of threads) {
-      md += `### \`${thread.path}\`${thread.isOutdated ? ' (outdated)' : ''}\n`;
+      const location = thread.line ? `${thread.path} (line ${thread.line})` : thread.path;
+      md += `### \`${location}\`${thread.isOutdated ? ' (outdated)' : ''}\n`;
 
       for (const comment of thread.comments) {
         md += `> **@${comment.author}**:\n`;
