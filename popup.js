@@ -1,13 +1,20 @@
-const KEYS = ['reviewerAvatars', 'scrapeReviewers', 'authorAvatar', 'hideAssignees', 'showReviewerNames', 'enableCache', 'copyFeedback'];
+const KEYS = ['reviewerAvatars', 'scrapeReviewers', 'authorAvatar', 'hideAssignees', 'showReviewerNames', 'enableCache', 'copyFeedback', 'includeCollapsed'];
 const TEXT_KEYS = ['ignoreUsers'];
 const TOKEN_KEY = 'ghToken';
 
 document.addEventListener('DOMContentLoaded', () => {
+  const updateCollapsedRowVisibility = () => {
+    document.getElementById('includeCollapsedRow').classList.toggle(
+      'hidden', !document.getElementById('copyFeedback').checked
+    );
+  };
+
   // Load saved settings
   chrome.storage.sync.get([...KEYS, ...TEXT_KEYS, TOKEN_KEY], (data) => {
     for (const key of KEYS) {
       document.getElementById(key).checked = !!data[key];
     }
+    updateCollapsedRowVisibility();
     for (const key of TEXT_KEYS) {
       if (data[key] != null) document.getElementById(key).value = data[key];
     }
@@ -22,6 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const val = e.target.checked;
       chrome.storage.sync.set({ [key]: val });
       notifyTab({ type: 'settingChanged', key, value: val });
+      if (key === 'copyFeedback') updateCollapsedRowVisibility();
     });
   }
 

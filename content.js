@@ -7,6 +7,7 @@
     showReviewerNames: false,
     enableCache: false,
     copyFeedback: false,
+    includeCollapsed: false,
     ignoreUsers: '',
     ghToken: '',
   };
@@ -459,7 +460,8 @@
       const comments = [];
       container.querySelectorAll('.review-comment, .js-review-comment').forEach((comment) => {
         const author = comment.querySelector('.author')?.textContent?.trim() || 'unknown';
-        const body = comment.querySelector('.comment-body, .js-comment-body')?.textContent?.trim() || '';
+        const bodyEl = comment.querySelector('.comment-body, .js-comment-body');
+        const body = (settings.includeCollapsed ? bodyEl?.textContent : bodyEl?.innerText)?.trim() || '';
         if (body) comments.push({ author, body });
       });
 
